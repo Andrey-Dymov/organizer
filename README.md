@@ -28,7 +28,7 @@
 
 1. Клонируйте репозиторий:
 ```
-git clone https://github.com/ваш-аккаунт/personal-organizer.git
+git clone https://github.com/Andrey-Dymov/personal-organizer.git
 cd personal-organizer
 ```
 
@@ -73,4 +73,4 @@ MIT
 
 ## Автор
 
-Ваше имя 
+Andrey Dymov 
