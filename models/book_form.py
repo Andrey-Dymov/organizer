@@ -19,7 +19,7 @@ BOOK_GENRES = [
 BOOK_STATUSES = ["План", "Читаю", "Прочитано"]
 
 class BookForm(MDCard):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, manager=None, list_widget=None, dialog=None, edit_index=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.orientation = "vertical"
         self.spacing = "-20dp"
@@ -34,10 +34,19 @@ class BookForm(MDCard):
         self.md_bg_color = [1, 1, 1, 1]
         self.pos_hint = {"center_x": 0.5, "center_y": 0.5}
         
+        # Сохраняем ссылки на менеджер, список и диалог
+        self.manager = manager
+        self.list_widget = list_widget
+        self.dialog = dialog
+        self.edit_index = edit_index
+        
         # Колбэки для обработки действий
         self.on_save = None
         self.on_delete = None
         self.on_cancel = None
+        
+        # Флаг для предотвращения множественных сохранений
+        self._saving = False
         
         # Создаем все поля формы
         self._create_fields()
@@ -259,6 +268,12 @@ class BookForm(MDCard):
         )
         menu.open()
 
+    def _select_status(self, status):
+        """Выбор статуса"""
+        self.selected_status = status
+        for s, radio in self.status_radios.items():
+            radio.active = (s == status)
+
     def _set_field_value(self, instance, value):
         """Установить значение поля"""
         instance.text = value
@@ -327,94 +342,80 @@ class BookForm(MDCard):
             )
         )
         
-        # Кнопка сохранения
-        buttons.append(
-            MDRaisedButton(
-                text="СОХРАНИТЬ",
-                font_size="14sp",
-                on_release=lambda x: self.on_save() if self.on_save and self.is_valid() else None
-            )
+        # Кнопка сохранения с защитой от множественных нажатий
+        save_button = MDRaisedButton(
+            text="СОХРАНИТЬ",
+            font_size="14sp"
         )
         
-        return buttons 
+        # Используем замыкание для создания обработчика с защитой от множественных вызовов
+        def safe_save_handler(instance):
+            if instance.disabled:
+                return
+                
+            if self.on_save and self.is_valid():
+                instance.disabled = True
+                self.on_save()
+                
+        save_button.bind(on_release=safe_save_handler)
+        buttons.append(save_button)
+        
+        return buttons
 
-    def _select_status(self, status):
-        """Выбор статуса"""
-        self.selected_status = status
-        for s, radio in self.status_radios.items():
-            radio.active = (s == status)
-
-    def _show_dropdown_menu(self, caller, items):
-        """Показать выпадающее меню"""
-        menu = MDDropdownMenu(
-            caller=caller,
-            items=items,
-            position="auto",
-            width_mult=4,
-        )
-        menu.open()
-
-    def _set_field_value(self, instance, value):
-        """Установить значение поля"""
-        instance.text = value
-        if hasattr(instance, 'menu'):
-            instance.menu.dismiss()
-
-    def get_data(self):
-        """Получить данные формы"""
-        return {
-            "title": self.title_field.text.strip(),
-            "author": self.author_field.text.strip(),
-            "genre": self.genre_field.text.strip(),
-            "status": self.selected_status,
-            "comment": self.comment_field.text.strip(),
-            "start_date": self.start_date_field.text.strip(),
-            "end_date": self.end_date_field.text.strip()
-        }
-
-    def is_valid(self):
-        """Проверка валидности данных формы"""
-        data = self.get_data()
-        return all([
-            data["title"],
-            data["author"],
-            data["genre"],
-            data["status"]
-        ])
-
-    def get_buttons(self, edit_mode=False):
-        """Создать кнопки формы"""
-        buttons = []
-        if edit_mode:
-            # Кнопка удаления для режима редактирования
-            buttons.append(
-                MDFlatButton(
-                    text="УДАЛИТЬ",
-                    theme_text_color="Custom",
-                    text_color=(0.9, 0.1, 0.1, 1),
-                    font_size="14sp",
-                    on_release=lambda x: self.on_delete() if self.on_delete else None
-                )
-            )
+    def save_data(self, *args):
+        """
+        Сохранение данных книги через менеджер
+        """
+        if not self.is_valid():
+            return
             
-        # Кнопка отмены
-        buttons.append(
-            MDFlatButton(
-                text="ОТМЕНА",
-                theme_text_color="Custom",
-                text_color=(0.33, 0.33, 0.98, 1),  # primary_color
-                font_size="14sp",
-                on_release=lambda x: self.on_cancel() if self.on_cancel else None
-            )
-        )
+        book_data = self.get_data()
         
-        # Кнопка сохранения
-        buttons.append(
-            MDRaisedButton(
-                text="СОХРАНИТЬ",
-                font_size="14sp",
-                on_release=lambda x: self.on_save() if self.on_save and self.is_valid() else None
-            )
-        )
+        # Добавляем флаг для предотвращения повторного сохранения
+        if hasattr(self, '_saving') and self._saving:
+            return
+            
+        self._saving = True
         
-        return buttons 
+        # Отключаем кнопку сохранения, чтобы избежать множественных сохранений
+        if hasattr(self.dialog, 'buttons') and self.dialog.buttons:
+            for button in self.dialog.buttons:
+                if button.text == "СОХРАНИТЬ":
+                    button.disabled = True
+        
+        if self.edit_index is not None:
+            # Обновление существующей книги
+            self.manager.update_book(self.edit_index, book_data)
+        else:
+            # Добавление новой книги
+            self.manager.add_book(book_data)
+            
+        # Обновляем список
+        if self.list_widget:
+            self.list_widget.update_list()
+            
+        # Закрываем диалог
+        if self.dialog:
+            self.dialog.dismiss()
+    
+    def delete_data(self, *args):
+        """
+        Удаление книги через менеджер
+        """
+        if self.edit_index is not None and self.manager:
+            self.manager.delete_book(self.edit_index)
+            
+            # Обновляем список
+            if self.list_widget:
+                self.list_widget.update_list()
+                
+            # Закрываем диалог
+            if self.dialog:
+                self.dialog.dismiss()
+                
+    def cancel(self, *args):
+        """
+        Отмена редактирования/создания
+        """
+        if self.dialog:
+            self.dialog.dismiss() 

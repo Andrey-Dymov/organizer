@@ -73,9 +73,10 @@ class BookList(ThemableBehavior, MDBoxLayout):
         self.list.clear_widgets()
         books = self.manager.get_books()
         self.record_count_label.text = f"Количество книг: {len(books)}"  # Обновляем количество записей
-        # Группируем книги по году
+        
+        # Группируем книги по году, сохраняя оригинальные индексы
         books_by_year = {}
-        for book in books:
+        for idx, book in enumerate(books):
             # Определяем год для группировки
             end_date = book.get('end_date', '')
             start_date = book.get('start_date', '')
@@ -87,7 +88,8 @@ class BookList(ThemableBehavior, MDBoxLayout):
             if year:
                 if year not in books_by_year:
                     books_by_year[year] = []
-                books_by_year[year].append(book)
+                # Сохраняем книгу вместе с её оригинальным индексом
+                books_by_year[year].append((idx, book))
 
         # Отображаем книги, сгруппированные по году
         for year in sorted(books_by_year.keys(), reverse=True):
@@ -95,7 +97,7 @@ class BookList(ThemableBehavior, MDBoxLayout):
             year_item = ThreeLineIconListItem(text=year, divider="Full", font_style="H6")
             year_item.height = "30dp"  # Уменьшаем высоту в два раза
             self.list.add_widget(year_item)
-            for idx, book in enumerate(books_by_year[year]):
+            for orig_idx, book in books_by_year[year]:
                 status_icon = {
                     "План": "book-clock",
                     "Читаю": "book-open-page-variant",
@@ -108,7 +110,7 @@ class BookList(ThemableBehavior, MDBoxLayout):
                     tertiary_text=f"{book.get('status', '')} • {book.get('start_date', '')} - {book.get('end_date', '')}",
                     divider="Full",
                     divider_color=self.theme_cls.divider_color,
-                    on_release=lambda x, i=idx: self.show_form_callback(i),
+                    on_release=lambda x, i=orig_idx: self._on_item_click(i, book),
                     font_style="H6"  # Делаем первую строку жирной
                 )
                 item.height = "60dp"  # Устанавливаем меньшую высоту
@@ -121,3 +123,19 @@ class BookList(ThemableBehavior, MDBoxLayout):
                 )
                 item.add_widget(icon)
                 self.list.add_widget(item) 
+
+    def _on_item_click(self, index, book):
+        """Обработчик нажатия на элемент списка с отладочной информацией"""
+        print(f"[DEBUG] Нажатие на книгу: {book.get('title')} (индекс: {index})")
+        # Проверяем, что индекс правильный
+        all_books = self.manager.get_books()
+        if 0 <= index < len(all_books):
+            selected_book = all_books[index]
+            print(f"[DEBUG] Выбранная книга: {selected_book.get('title')} (автор: {selected_book.get('author')})")
+            if selected_book.get('title') != book.get('title') or selected_book.get('author') != book.get('author'):
+                print(f"[ОШИБКА] Несоответствие книг! Ожидалась: {book.get('title')}, получена: {selected_book.get('title')}")
+        else:
+            print(f"[ОШИБКА] Индекс {index} вне диапазона [0, {len(all_books)-1}]")
+        
+        # Вызываем оригинальный обработчик
+        self.show_form_callback(index) 

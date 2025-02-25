@@ -34,22 +34,25 @@ class BaseManager:
             os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
             with open(self.data_file, "w", encoding="utf-8") as file:
                 json.dump(self.items, file, ensure_ascii=False, indent=2)
-                print(f"Сохранено записей: {len(self.items)}")
+                print(f"[DEBUG] BaseManager.save_data: сохранено записей: {len(self.items)} в {self.data_file}")
         except Exception as e:
             print(f"Ошибка при сохранении: {e}")
     
     def add_item(self, item):
         """Добавление записи"""
+        print(f"[DEBUG] BaseManager.add_item: добавление записи в {self.data_file}")
         self.items.append(item)
         self.save_data()
     
     def update_item(self, index, item):
         """Обновление записи"""
+        print(f"[DEBUG] BaseManager.update_item: обновление записи с индексом {index} в {self.data_file}")
         self.items[index] = item
         self.save_data()
     
     def delete_item(self, index):
         """Удаление записи"""
+        print(f"[DEBUG] BaseManager.delete_item: удаление записи с индексом {index} из {self.data_file}")
         del self.items[index]
         self.save_data()
     

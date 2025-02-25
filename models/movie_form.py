@@ -12,29 +12,40 @@ from kivymd.uix.selectioncontrol import MDCheckbox
 MOVIE_GENRES = [
     "Боевик", "Комедия", "Драма", "Фантастика", "Триллер",
     "Ужасы", "Мелодрама", "Приключения", "Документальный",
-    "Мультфильм", "Детектив", "Фэнтези"
+    "Мультфильм", "Детектив", "Фэнтези", "Исторический",
+    "Биографический", "Военный", "Вестерн", "Мюзикл"
 ]
 
-MOVIE_TYPES = ["Фильм", "Сериал"]
+MOVIE_TYPES = ["Фильм", "Сериал", "Аниме", "Мультфильм", "Документальный"]
 MOVIE_STATUSES = ["План", "Смотрю", "Просмотрено"]
 
 class MovieForm(MDCard):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, manager=None, list_widget=None, dialog=None, edit_index=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.orientation = "vertical"
         self.spacing = "-20dp"
         self.padding = "16dp"
         self.size_hint = (0.9, None)
-        self.height = str(50*(9+2)+25) + 'dp'  # 8 полей + 1 поле даты + отступы
+        self.height = str(50*(7+2)+25) + 'dp'  # 7 полей + 2 поля дат + отступы
         self.elevation = 0
         self.radius = [16]
         self.md_bg_color = [1, 1, 1, 1]
         self.pos_hint = {"center_x": 0.5, "center_y": 0.5}
         
+        # Сохраняем ссылки на менеджер, список и диалог
+        self.manager = manager
+        self.list_widget = list_widget
+        self.dialog = dialog
+        self.edit_index = edit_index
+        
         # Колбэки для обработки действий
         self.on_save = None
         self.on_delete = None
         self.on_cancel = None
+        
+        # Флаг для предотвращения множественных сохранений
+        self._saving = False
+        print("[DEBUG] MovieForm.__init__: инициализирован с _saving=False")
         
         # Создаем все поля формы
         self._create_fields()
@@ -409,6 +420,7 @@ class MovieForm(MDCard):
 
     def get_buttons(self, edit_mode=False):
         """Создать кнопки формы"""
+        print(f"[DEBUG] MovieForm.get_buttons: вызван с edit_mode={edit_mode}")
         buttons = []
         if edit_mode:
             # Кнопка удаления для режима редактирования
@@ -433,16 +445,29 @@ class MovieForm(MDCard):
             )
         )
         
-        # Кнопка сохранения
-        buttons.append(
-            MDRaisedButton(
-                text="СОХРАНИТЬ",
-                font_size="14sp",
-                on_release=lambda x: self.on_save() if self.on_save and self.is_valid() else None
-            )
+        # Кнопка сохранения с защитой от множественных нажатий
+        save_button = MDRaisedButton(
+            text="СОХРАНИТЬ",
+            font_size="14sp"
         )
         
-        return buttons 
+        # Используем замыкание для создания обработчика с защитой от множественных вызовов
+        def safe_save_handler(instance):
+            print(f"[DEBUG] MovieForm: обработчик кнопки СОХРАНИТЬ вызван, disabled={instance.disabled}")
+            if instance.disabled:
+                print("[DEBUG] MovieForm: кнопка уже отключена, игнорируем нажатие")
+                return
+                
+            if self.on_save and self.is_valid():
+                instance.disabled = True
+                print("[DEBUG] MovieForm: кнопка отключена, вызываем on_save")
+                self.on_save()
+                
+        save_button.bind(on_release=safe_save_handler)
+        buttons.append(save_button)
+        
+        print(f"[DEBUG] MovieForm.get_buttons: создано {len(buttons)} кнопок")
+        return buttons
 
     def _select_type(self, type_name):
         """Выбрать тип фильма"""
@@ -468,3 +493,91 @@ class MovieForm(MDCard):
         self.selected_status = status
         for s, radio in self.status_radios.items():
             radio.active = (s == status)
+
+    def save_data(self, *args):
+        """
+        Сохранение данных фильма через менеджер
+        """
+        print(f"[DEBUG] MovieForm.save_data вызван с аргументами: {args}")
+        
+        if not self.is_valid():
+            print("[DEBUG] MovieForm: данные не прошли валидацию")
+            return
+            
+        movie_data = self.get_data()
+        print(f"[DEBUG] MovieForm: получены данные фильма: {movie_data['title']}")
+        
+        # Добавляем флаг для предотвращения повторного сохранения
+        if hasattr(self, '_saving') and self._saving:
+            print("[DEBUG] MovieForm: сохранение уже выполняется, прерываем")
+            return
+            
+        self._saving = True
+        print("[DEBUG] MovieForm: установлен флаг _saving=True")
+        
+        try:
+            # Отключаем кнопку сохранения, если она есть
+            if hasattr(self.dialog, 'buttons') and self.dialog.buttons:
+                print(f"[DEBUG] MovieForm: найдено {len(self.dialog.buttons)} кнопок")
+                for i, button in enumerate(self.dialog.buttons):
+                    print(f"[DEBUG] MovieForm: кнопка {i}: текст='{button.text}', disabled={button.disabled}")
+                    if button.text == "СОХРАНИТЬ":
+                        print("[DEBUG] MovieForm: отключаем кнопку СОХРАНИТЬ")
+                        button.disabled = True
+            
+            if self.edit_index is not None:
+                # Обновление существующего фильма
+                print(f"[DEBUG] MovieForm: обновляем фильм с индексом {self.edit_index}")
+                self.manager.update_movie(self.edit_index, movie_data)
+            else:
+                # Добавление нового фильма
+                print("[DEBUG] MovieForm: добавляем новый фильм")
+                self.manager.add_movie(movie_data)
+                
+            # Обновляем список
+            if self.list_widget:
+                print("[DEBUG] MovieForm: обновляем список")
+                self.list_widget.update_list()
+                
+            # Закрываем диалог
+            if self.dialog:
+                print("[DEBUG] MovieForm: закрываем диалог")
+                self.dialog.dismiss()
+                
+            # Вызываем колбэк, если он установлен
+            if self.on_save:
+                print("[DEBUG] MovieForm: вызываем колбэк on_save")
+                self.on_save()
+        finally:
+            self._saving = False
+            print("[DEBUG] MovieForm: сброшен флаг _saving=False")
+    
+    def delete_data(self, *args):
+        """
+        Удаление фильма через менеджер
+        """
+        if self.edit_index is not None and self.manager:
+            self.manager.delete_movie(self.edit_index)
+            
+            # Обновляем список
+            if self.list_widget:
+                self.list_widget.update_list()
+                
+            # Закрываем диалог
+            if self.dialog:
+                self.dialog.dismiss()
+                
+            # Вызываем колбэк, если он установлен
+            if self.on_delete:
+                self.on_delete()
+                
+    def cancel(self, *args):
+        """
+        Отмена редактирования/создания
+        """
+        if self.dialog:
+            self.dialog.dismiss()
+            
+        # Вызываем колбэк, если он установлен
+        if self.on_cancel:
+            self.on_cancel()

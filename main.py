@@ -16,21 +16,28 @@ from models import (
 )
 
 class OrganizerApp(MDApp):
+    """
+    Основной класс приложения "Личный органайзер"
+    """
+    
     def __init__(self, **kwargs):
+        """Инициализация приложения"""
         super().__init__(**kwargs)
+        # Настройка темы
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.accent_palette = "Teal"
         self.theme_cls.theme_style = "Light"
         
-        # Инициализация менеджеров
+        # Инициализация менеджеров данных
         self.contact_manager = ContactManager()
         self.book_manager = BookManager()
         self.movie_manager = MovieManager()
         
-        # Индекс текущей редактируемой записи
-        self.current_edit_index = None 
+        # Диалог для форм
+        self.dialog = None
 
     def build(self):
+        """Построение основного интерфейса приложения"""
         screen = MDScreen()
         
         # Добавляем верхнюю панель
@@ -57,6 +64,7 @@ class OrganizerApp(MDApp):
         return screen
 
     def create_contacts_tab(self):
+        """Создание вкладки контактов"""
         tab = MDBottomNavigationItem(
             name="contacts",
             text="Контакты",
@@ -73,6 +81,7 @@ class OrganizerApp(MDApp):
         return tab
 
     def create_books_tab(self):
+        """Создание вкладки книг"""
         tab = MDBottomNavigationItem(
             name="books",
             text="Книги",
@@ -89,6 +98,7 @@ class OrganizerApp(MDApp):
         return tab
 
     def create_movies_tab(self):
+        """Создание вкладки фильмов"""
         tab = MDBottomNavigationItem(
             name="movies",
             text="Фильмы",
@@ -106,24 +116,28 @@ class OrganizerApp(MDApp):
 
     # Методы для работы с контактами
     def show_contact_dialog(self, index=None):
+        """
+        Отображение диалога для создания/редактирования контакта
+        
+        Args:
+            index (int, optional): Индекс редактируемого контакта. None для создания нового.
+        """
+        # Определяем заголовок диалога
+        title = "Редактировать контакт" if index is not None else "Новый контакт"
+        
+        # Создаем форму с передачей всех необходимых параметров
+        self.form = ContactForm(
+            manager=self.contact_manager,
+            list_widget=self.contact_list,
+            edit_index=index
+        )
+        
+        # Если редактируем существующий контакт, загружаем данные
         if index is not None:
-            # Редактирование
             contact = self.contact_manager.get_contacts()[index]
-            self.current_edit_index = index
-            self.form = ContactForm()
             self.form.set_data(contact)
-            title = "Редактировать контакт"
-        else:
-            # Создание
-            self.current_edit_index = None
-            self.form = ContactForm()
-            title = "Новый контакт"
         
-        # Устанавливаем обработчики
-        self.form.on_save = self.save_contact
-        self.form.on_delete = self.delete_contact
-        self.form.on_cancel = lambda: self.dialog.dismiss()
-        
+        # Создаем диалог
         self.dialog = MDDialog(
             title=title,
             type="custom",
@@ -131,43 +145,42 @@ class OrganizerApp(MDApp):
             radius=[20, 20, 20, 20],
             buttons=self.form.get_buttons(edit_mode=index is not None)
         )
+        
+        # Устанавливаем ссылку на диалог в форме
+        self.form.dialog = self.dialog
+        
+        # Устанавливаем обработчики
+        self.form.on_save = self.form.save_data
+        self.form.on_delete = self.form.delete_data
+        self.form.on_cancel = self.form.cancel
+        
+        # Открываем диалог
         self.dialog.open()
-
-    def save_contact(self, *args):
-        if self.form.is_valid():
-            if self.current_edit_index is not None:
-                self.contact_manager.update_contact(self.current_edit_index, self.form.get_data())
-            else:
-                self.contact_manager.add_contact(self.form.get_data())
-            self.contact_list.update_list()
-            self.dialog.dismiss()
-
-    def delete_contact(self):
-        print(f"Удаление контакта с индексом: {self.current_edit_index}")  # Отладочное сообщение
-        self.contact_manager.delete_contact(self.current_edit_index)
-        self.contact_list.update_list()
-        self.dialog.dismiss()
 
     # Методы для работы с книгами
     def show_book_dialog(self, index=None):
+        """
+        Отображение диалога для создания/редактирования книги
+        
+        Args:
+            index (int, optional): Индекс редактируемой книги. None для создания новой.
+        """
+        # Определяем заголовок диалога
+        title = "Редактировать книгу" if index is not None else "Новая книга"
+        
+        # Создаем форму с передачей всех необходимых параметров
+        self.form = BookForm(
+            manager=self.book_manager,
+            list_widget=self.book_list,
+            edit_index=index
+        )
+        
+        # Если редактируем существующую книгу, загружаем данные
         if index is not None:
-            # Редактирование
             book = self.book_manager.get_books()[index]
-            self.current_edit_index = index
-            self.form = BookForm()
             self.form.set_data(book)
-            title = "Редактировать книгу"
-        else:
-            # Создание
-            self.current_edit_index = None
-            self.form = BookForm()
-            title = "Новая книга"
         
-        # Устанавливаем обработчики
-        self.form.on_save = self.save_book
-        self.form.on_delete = self.delete_book
-        self.form.on_cancel = lambda: self.dialog.dismiss()
-        
+        # Создаем диалог
         self.dialog = MDDialog(
             title=title,
             type="custom",
@@ -175,42 +188,47 @@ class OrganizerApp(MDApp):
             radius=[20, 20, 20, 20],
             buttons=self.form.get_buttons(edit_mode=index is not None)
         )
+        
+        # Устанавливаем ссылку на диалог в форме
+        self.form.dialog = self.dialog
+        
+        # Устанавливаем обработчики
+        self.form.on_save = self.form.save_data
+        self.form.on_delete = self.form.delete_data
+        self.form.on_cancel = self.form.cancel
+        
+        # Открываем диалог
         self.dialog.open()
-
-    def save_book(self, *args):
-        if self.form.is_valid():
-            if self.current_edit_index is not None:
-                self.book_manager.update_book(self.current_edit_index, self.form.get_data())
-            else:
-                self.book_manager.add_book(self.form.get_data())
-            self.book_list.update_list()
-            self.dialog.dismiss()
-
-    def delete_book(self):
-        self.book_manager.delete_book(self.current_edit_index)
-        self.book_list.update_list()
-        self.dialog.dismiss()
 
     # Методы для работы с фильмами
     def show_movie_dialog(self, index=None):
+        """
+        Отображение диалога для создания/редактирования фильма
+        
+        Args:
+            index (int, optional): Индекс редактируемого фильма. None для создания нового.
+        """
+        print(f"[DEBUG] OrganizerApp.show_movie_dialog: вызван с индексом {index}")
+        
+        # Определяем заголовок диалога
+        title = "Редактировать фильм" if index is not None else "Новый фильм"
+        print(f"[DEBUG] OrganizerApp.show_movie_dialog: заголовок '{title}'")
+        
+        # Создаем форму с передачей всех необходимых параметров
+        self.form = MovieForm(
+            manager=self.movie_manager,
+            list_widget=self.movie_list,
+            edit_index=index
+        )
+        print("[DEBUG] OrganizerApp.show_movie_dialog: создана форма MovieForm")
+        
+        # Если редактируем существующий фильм, загружаем данные
         if index is not None:
-            # Редактирование
             movie = self.movie_manager.get_movies()[index]
-            self.current_edit_index = index
-            self.form = MovieForm()
             self.form.set_data(movie)
-            title = "Редактировать фильм"
-        else:
-            # Создание
-            self.current_edit_index = None
-            self.form = MovieForm()
-            title = "Новый фильм"
+            print(f"[DEBUG] OrganizerApp.show_movie_dialog: загружены данные фильма '{movie.get('title', '')}'")
         
-        # Устанавливаем обработчики
-        self.form.on_save = self.save_movie
-        self.form.on_delete = self.delete_movie
-        self.form.on_cancel = lambda: self.dialog.dismiss()
-        
+        # Создаем диалог
         self.dialog = MDDialog(
             title=title,
             type="custom",
@@ -218,21 +236,21 @@ class OrganizerApp(MDApp):
             radius=[20, 20, 20, 20],
             buttons=self.form.get_buttons(edit_mode=index is not None)
         )
+        print("[DEBUG] OrganizerApp.show_movie_dialog: создан диалог")
+        
+        # Устанавливаем ссылку на диалог в форме
+        self.form.dialog = self.dialog
+        print("[DEBUG] OrganizerApp.show_movie_dialog: установлена ссылка на диалог в форме")
+        
+        # Устанавливаем обработчики
+        self.form.on_save = self.form.save_data
+        self.form.on_delete = self.form.delete_data
+        self.form.on_cancel = self.form.cancel
+        print("[DEBUG] OrganizerApp.show_movie_dialog: установлены обработчики событий")
+        
+        # Открываем диалог
         self.dialog.open()
-
-    def save_movie(self, *args):
-        if self.form.is_valid():
-            if self.current_edit_index is not None:
-                self.movie_manager.update_movie(self.current_edit_index, self.form.get_data())
-            else:
-                self.movie_manager.add_movie(self.form.get_data())
-            self.movie_list.update_list()
-            self.dialog.dismiss()
-
-    def delete_movie(self):
-        self.movie_manager.delete_movie(self.current_edit_index)
-        self.movie_list.update_list()
-        self.dialog.dismiss()
+        print("[DEBUG] OrganizerApp.show_movie_dialog: диалог открыт")
 
 if __name__ == "__main__":
     OrganizerApp().run() 

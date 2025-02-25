@@ -11,11 +11,11 @@ from kivymd.uix.button import MDFlatButton, MDRaisedButton
 CITIES = [
     "Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", 
     "Казань", "Нижний Новгород", "Челябинск", "Самара", 
-    "Омск", "Ростов-на-Дону"
+    "Омск", "Ростов-на-Дону", "Уфа", "Красноярск", "Воронеж", "Пермь", "Волгоград"
 ]
 
 class ContactForm(MDCard):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, manager=None, list_widget=None, dialog=None, edit_index=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.orientation = "vertical"
         self.spacing = "-20dp"
@@ -28,6 +28,12 @@ class ContactForm(MDCard):
         self.radius = [16]
         self.md_bg_color = [1, 1, 1, 1]
         self.pos_hint = {"center_x": 0.5, "center_y": 0.5}
+        
+        # Сохраняем ссылки на менеджер, список и диалог
+        self.manager = manager
+        self.list_widget = list_widget
+        self.dialog = dialog
+        self.edit_index = edit_index
         
         # Колбэки для обработки действий
         self.on_save = None
@@ -235,3 +241,66 @@ class ContactForm(MDCard):
         )
         
         return buttons 
+
+    def save_data(self, *args):
+        """
+        Сохранение данных контакта через менеджер
+        """
+        if not self.is_valid():
+            return
+            
+        contact_data = self.get_data()
+        
+        # Отключаем кнопку сохранения, чтобы избежать множественных сохранений
+        for button in self.dialog.buttons:
+            if button.text == "СОХРАНИТЬ":
+                button.disabled = True
+        
+        if self.edit_index is not None:
+            # Обновление существующего контакта
+            self.manager.update_contact(self.edit_index, contact_data)
+        else:
+            # Добавление нового контакта
+            self.manager.add_contact(contact_data)
+            
+        # Обновляем список
+        if self.list_widget:
+            self.list_widget.update_list()
+            
+        # Закрываем диалог
+        if self.dialog:
+            self.dialog.dismiss()
+            
+        # Вызываем колбэк, если он установлен
+        if self.on_save:
+            self.on_save()
+    
+    def delete_data(self, *args):
+        """
+        Удаление контакта через менеджер
+        """
+        if self.edit_index is not None and self.manager:
+            self.manager.delete_contact(self.edit_index)
+            
+            # Обновляем список
+            if self.list_widget:
+                self.list_widget.update_list()
+                
+            # Закрываем диалог
+            if self.dialog:
+                self.dialog.dismiss()
+                
+            # Вызываем колбэк, если он установлен
+            if self.on_delete:
+                self.on_delete()
+                
+    def cancel(self, *args):
+        """
+        Отмена редактирования/создания
+        """
+        if self.dialog:
+            self.dialog.dismiss()
+            
+        # Вызываем колбэк, если он установлен
+        if self.on_cancel:
+            self.on_cancel() 

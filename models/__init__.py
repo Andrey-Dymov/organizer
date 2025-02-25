@@ -6,54 +6,10 @@ from .book_list import BookList
 from .movie_list import MovieList
 from .contact_list import ContactList
 
-# Создаем классы менеджеров
-class BookManager(BaseManager):
-    def __init__(self):
-        super().__init__("books.json")
-    
-    def add_book(self, book):
-        self.add_item(book)
-    
-    def update_book(self, index, book):
-        self.update_item(index, book)
-    
-    def delete_book(self, index):
-        self.delete_item(index)
-    
-    def get_books(self):
-        return self.get_items()
-
-class MovieManager(BaseManager):
-    def __init__(self):
-        super().__init__("movies.json")
-    
-    def add_movie(self, movie):
-        self.add_item(movie)
-    
-    def update_movie(self, index, movie):
-        self.update_item(index, movie)
-    
-    def delete_movie(self, index):
-        self.delete_item(index)
-    
-    def get_movies(self):
-        return self.get_items()
-
-class ContactManager(BaseManager):
-    def __init__(self):
-        super().__init__("contacts.json")
-    
-    def add_contact(self, contact):
-        self.add_item(contact)
-    
-    def update_contact(self, index, contact):
-        self.update_item(index, contact)
-    
-    def delete_contact(self, index):
-        self.delete_item(index)
-    
-    def get_contacts(self):
-        return self.get_items()
+# Импортируем менеджеры из новых файлов
+from .book_model import BookManager
+from .movie_model import MovieManager
+from .contact_model import ContactManager
 
 __all__ = [
     'BookForm', 'BookManager', 'BookList', 'BOOK_GENRES', 'BOOK_STATUSES',
