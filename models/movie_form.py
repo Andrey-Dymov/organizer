@@ -26,7 +26,7 @@ class MovieForm(MDCard):
         self.spacing = "-20dp"
         self.padding = "16dp"
         self.size_hint = (0.9, None)
-        self.height = str(50*(7+2)+25) + 'dp'  # 7 полей + 2 поля дат + отступы
+        self.height = str(50*(8+2)+25) + 'dp'  # 7 полей + 2 поля дат + отступы
         self.elevation = 0
         self.radius = [16]
         self.md_bg_color = [1, 1, 1, 1]
